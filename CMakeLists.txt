@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(qfiletransport VERSION 0.1 LANGUAGES CXX)
+project(qfiletransport VERSION 0.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -48,3 +48,4 @@ add_library(${CMAKE_PROJECT_NAME} SHARED qfiletransport.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt5::Core audcore)
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "EXPORT=__declspec(dllexport)")

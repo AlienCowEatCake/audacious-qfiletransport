@@ -9,6 +9,7 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QString>
 #include <QUrl>
 
@@ -109,6 +110,28 @@ public:
     QFileTransport() : TransportPlugin(info, schemes)
     {
         installUriSchemeHook();
+    }
+
+    void cleanup() Q_DECL_OVERRIDE
+    {
+        /// @note Clear timestamp from plugin registry to avoid plugin caching
+        /// Cached plugins is lazy-loaded, but we need to install hook
+        StringBuf path =
+            filename_build({aud_get_path(AudPath::UserDir), "plugin-registry"});
+        QFile file((QString(path)));
+        if (!file.open(QFile::ReadWrite | QFile::Text))
+            return;
+
+        QString registryData = QString::fromUtf8(file.readAll());
+        const QRegularExpression re("(qfiletransport\\.dll[\r\n]stamp )[0-9]*",
+                                    QRegularExpression::MultilineOption);
+        const QRegularExpressionMatch match = re.match(registryData);
+        if (match.hasMatch())
+            registryData.replace(re, match.captured(1) + "0");
+        file.seek(0);
+        file.resize(0);
+        file.write(registryData.toUtf8());
+        file.close();
     }
 
     VFSImpl * fopen(const char * path, const char * mode,
@@ -289,4 +312,4 @@ private:
     };
 };
 
-__declspec(dllexport) QFileTransport aud_plugin_instance;
+EXPORT QFileTransport aud_plugin_instance;
