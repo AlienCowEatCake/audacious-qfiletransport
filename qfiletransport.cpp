@@ -71,10 +71,11 @@ static StringBuf uri_get_scheme_patched(const char * uri)
 
 static void installUriSchemeHook()
 {
-#if defined(_WIN32) && defined(_M_IX86)
+#if defined(_WIN32)
     HINSTANCE audcoreLib = LoadLibraryA("audcore.dll");
     if (audcoreLib)
     {
+#if defined(_M_IX86)
         LPVOID originalAddress = reinterpret_cast<LPVOID>(
             GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
         if (originalAddress)
@@ -91,6 +92,7 @@ static void installUriSchemeHook()
             WriteProcessMemory(GetCurrentProcess(), originalAddress, patch,
                                jumpSize, Q_NULLPTR);
         }
+#endif
         FreeLibrary(audcoreLib);
     }
 #endif
@@ -115,7 +117,7 @@ public:
     void cleanup() Q_DECL_OVERRIDE
     {
         /// @note Clear timestamp from plugin registry to avoid plugin caching
-        /// Cached plugins is lazy-loaded, but we need to install hook
+        /// Cached plugins are lazy-loaded, but we need to install hook
         StringBuf path =
             filename_build({aud_get_path(AudPath::UserDir), "plugin-registry"});
         QFile file((QString(path)));
@@ -123,7 +125,7 @@ public:
             return;
 
         QString registryData = QString::fromUtf8(file.readAll());
-        const QRegularExpression re("(qfiletransport\\.dll[\r\n]stamp )[0-9]*",
+        const QRegularExpression re("(qfiletransport\\.dll[\r\n]+stamp )[0-9]*",
                                     QRegularExpression::MultilineOption);
         const QRegularExpressionMatch match = re.match(registryData);
         if (match.hasMatch())
