@@ -72,7 +72,10 @@ static StringBuf uri_get_scheme_patched(const char * uri)
 static void installUriSchemeHook()
 {
 #if defined(_WIN32)
-    HINSTANCE audcoreLib = LoadLibraryA("audcore.dll");
+#if !defined(AUDCORE_DLL_NAME)
+#define AUDCORE_DLL_NAME "audcore"
+#endif
+    HINSTANCE audcoreLib = LoadLibraryA(AUDCORE_DLL_NAME ".dll");
     if (audcoreLib)
     {
 #if defined(_M_IX86)

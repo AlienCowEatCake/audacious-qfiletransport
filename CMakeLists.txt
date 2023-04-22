@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(qfiletransport VERSION 0.2 LANGUAGES CXX)
+project(qfiletransport VERSION 0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,25 +8,36 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 set(AUDACIOUS_ROOT_DIR "$ENV{ProgramFiles\(x86\)}\\Audacious" CACHE PATH "Path to Audacions binaries root directory")
 
+set(AUDCORE_DLL_NAME)
+foreach(AUDCORE_DLL_NAME_TEST "audcore" "audcore5")
+    if(EXISTS "${AUDACIOUS_ROOT_DIR}/bin/${AUDCORE_DLL_NAME_TEST}.dll")
+        set(AUDCORE_DLL_NAME "${AUDCORE_DLL_NAME_TEST}")
+        break()
+    endif()
+endforeach()
+if(NOT AUDCORE_DLL_NAME)
+    message(FATAL_ERROR "AUDCORE was not found, please check AUDACIOUS_ROOT_DIR=\"${AUDACIOUS_ROOT_DIR}\"")
+endif()
+
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/libaudcore.dll.a")
-    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/audcore.def")
-        message("Generating audcore.def ...")
+    if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${AUDCORE_DLL_NAME}.def")
+        message("Generating ${AUDCORE_DLL_NAME}.def ...")
         find_program(GENDEF_PROG gendef REQUIRED)
         execute_process(
-            COMMAND "${GENDEF_PROG}" "${AUDACIOUS_ROOT_DIR}/bin/audcore.dll"
+            COMMAND "${GENDEF_PROG}" "${AUDACIOUS_ROOT_DIR}/bin/${AUDCORE_DLL_NAME}.dll"
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
         )
 
-        message("Patching audcore.def ...")
-        file(READ "${CMAKE_CURRENT_BINARY_DIR}/audcore.def" AUDCORE_DEF_DATA)
+        message("Patching ${AUDCORE_DLL_NAME}.def ...")
+        file(READ "${CMAKE_CURRENT_BINARY_DIR}/${AUDCORE_DLL_NAME}.def" AUDCORE_DEF_DATA)
         string(REGEX REPLACE "@[0-9]*" "" AUDCORE_DEF_DATA "${AUDCORE_DEF_DATA}")
-        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/audcore.def" "${AUDCORE_DEF_DATA}")
+        file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/${AUDCORE_DLL_NAME}.def" "${AUDCORE_DEF_DATA}")
     endif()
 
     message("Generating libaudcore.dll.a ...")
     find_program(DLLTOOL_PROG dlltool REQUIRED)
     execute_process(
-        COMMAND "${DLLTOOL_PROG}" -d "audcore.def" -D "audcore.dll" -l "libaudcore.dll.a"
+        COMMAND "${DLLTOOL_PROG}" -d "${AUDCORE_DLL_NAME}.def" -D "${AUDCORE_DLL_NAME}.dll" -l "libaudcore.dll.a"
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
     )
 endif()
@@ -48,4 +59,5 @@ add_library(${CMAKE_PROJECT_NAME} SHARED qfiletransport.cpp)
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt5::Core audcore)
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "AUDCORE_DLL_NAME=\"${AUDCORE_DLL_NAME}\"")
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "EXPORT=__declspec(dllexport)")
