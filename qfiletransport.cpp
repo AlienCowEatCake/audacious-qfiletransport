@@ -69,6 +69,133 @@ static StringBuf uri_get_scheme_patched(const char * uri)
     return delim ? str_copy(uri, delim - uri) : StringBuf();
 }
 
+struct SearchParams
+{
+    QString filename;
+    QStringList include, exclude;
+};
+
+static bool hasFrontCoverExtension(const QString & name)
+{
+    const QString ext = QFileInfo(name).suffix();
+    if (ext.isEmpty())
+        return false;
+
+    static const QStringList exts = {"jpg", "jpeg", "png", "webp"};
+    return exts.contains(ext, Qt::CaseInsensitive);
+}
+
+static bool coverNameFilter(const QString & name, const QStringList & keywords,
+                            bool retOnEmpty)
+{
+    if (keywords.isEmpty())
+        return retOnEmpty;
+
+    for (const QString & keyword : keywords)
+    {
+        if (name.contains(keyword, Qt::CaseInsensitive))
+            return true;
+    }
+
+    return false;
+}
+
+static bool sameBasename(const QString & a, const QString & b)
+{
+    const QString bnA = QFileInfo(a).completeBaseName();
+    const QString bnB = QFileInfo(b).completeBaseName();
+    return bnA.compare(bnB, Qt::CaseInsensitive) == 0;
+}
+
+static QString fileinfoRecursiveGetImage(const QString & path,
+                                         const SearchParams * params, int depth)
+{
+    const QDir pathDir(path);
+    if (!pathDir.exists() || !pathDir.isReadable())
+        return QString();
+
+    if (aud_get_bool("use_file_cover") && !depth)
+    {
+        // Look for images matching file name
+        QDirIterator it(path, QDir::Files | QDir::Readable);
+        while (!it.next().isEmpty())
+        {
+            const QFileInfo fileInfo = it.fileInfo();
+            const QString name = fileInfo.fileName();
+            if (hasFrontCoverExtension(name) &&
+                sameBasename(name, params->filename))
+            {
+                return fileInfo.absoluteFilePath();
+            }
+        }
+    }
+
+    // Search for files using filter
+    QDirIterator it(path, QDir::Files | QDir::Readable);
+    while (!it.next().isEmpty())
+    {
+        const QFileInfo fileInfo = it.fileInfo();
+        const QString name = fileInfo.fileName();
+        if (hasFrontCoverExtension(name) &&
+            coverNameFilter(name, params->include, true) &&
+            !coverNameFilter(name, params->exclude, false))
+        {
+            return fileInfo.absoluteFilePath();
+        }
+    }
+
+    if (aud_get_bool("recurse_for_cover") &&
+        depth < aud_get_int("recurse_for_cover_depth"))
+    {
+        // Descend into directories recursively.
+        QDirIterator it(path,
+                        QDir::Dirs | QDir::NoDotAndDotDot | QDir::Readable);
+        while (!it.next().isEmpty())
+        {
+            const QFileInfo fileInfo = it.fileInfo();
+            const QString newpath = fileInfo.absoluteFilePath();
+            const QString tmp =
+                fileinfoRecursiveGetImage(newpath, params, depth + 1);
+
+            if (!tmp.isEmpty())
+                return tmp;
+        }
+    }
+
+    return QString();
+}
+
+static QStringList strListToQStringList(const char * list, const char * delims)
+{
+    const Index<String> index = str_list_to_index(list, delims);
+    QStringList result;
+    for (const String & str : index)
+        result.append(QString::fromLocal8Bit(str));
+    return result;
+}
+
+static String art_search_patched(const char * filename)
+{
+    QString local = toLocalFile(filename);
+    if (local.isEmpty())
+        return String();
+
+    const QString elem = QFileInfo(local).fileName();
+    if (elem.isEmpty())
+        return String();
+
+    String include = aud_get_str("cover_name_include");
+    String exclude = aud_get_str("cover_name_exclude");
+
+    SearchParams params = {elem, strListToQStringList(include, ", "),
+                           strListToQStringList(exclude, ", ")};
+
+    local = QFileInfo(local).absolutePath();
+    const QString imageLocal = fileinfoRecursiveGetImage(local, &params, 0);
+    return imageLocal.isEmpty() ? String()
+                                : String(fromLocalFile(imageLocal).constData());
+}
+
 static void installUriSchemeHook()
 {
 #if defined(_WIN32)
@@ -79,21 +206,39 @@ static void installUriSchemeHook()
     if (audcoreLib)
     {
 #if defined(_M_IX86)
-        LPVOID originalAddress = reinterpret_cast<LPVOID>(
+        LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
             GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
-        if (originalAddress)
+        if (originalAddressUriGetScheme)
         {
-            LPVOID patchedAddress =
+            LPVOID patchedAddressUriGetScheme =
                 reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
             constexpr size_t jumpSize = 1 + sizeof(LPVOID);
             const size_t jumpOffset =
-                reinterpret_cast<size_t>(patchedAddress) -
-                (reinterpret_cast<size_t>(originalAddress) + jumpSize);
+                reinterpret_cast<size_t>(patchedAddressUriGetScheme) -
+                (reinterpret_cast<size_t>(originalAddressUriGetScheme) +
+                 jumpSize);
             char patch[jumpSize];
             memcpy(patch, "\xE9", 1);
             memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
-            WriteProcessMemory(GetCurrentProcess(), originalAddress, patch,
-                               jumpSize, Q_NULLPTR);
+            WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
+                               patch, jumpSize, Q_NULLPTR);
+        }
+
+        LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
+            GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
+        if (originalAddressArtSearch)
+        {
+            LPVOID patchedAddressArtSearch =
+                reinterpret_cast<LPVOID>(&art_search_patched);
+            constexpr size_t jumpSize = 1 + sizeof(LPVOID);
+            const size_t jumpOffset =
+                reinterpret_cast<size_t>(patchedAddressArtSearch) -
+                (reinterpret_cast<size_t>(originalAddressArtSearch) + jumpSize);
+            char patch[jumpSize];
+            memcpy(patch, "\xE9", 1);
+            memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
+            WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
+                               patch, jumpSize, Q_NULLPTR);
         }
 #endif
         FreeLibrary(audcoreLib);
