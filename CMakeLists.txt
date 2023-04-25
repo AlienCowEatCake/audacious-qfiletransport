@@ -53,6 +53,21 @@ configure_file(
 )
 include_directories("${CMAKE_CURRENT_LIST_DIR}/audacious/src" "${CMAKE_CURRENT_BINARY_DIR}")
 
+set(PLUGIN_VERSION "v${CMAKE_PROJECT_VERSION}")
+find_package(Git)
+if(Git_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+        OUTPUT_VARIABLE GIT_REVISION
+        ERROR_QUIET
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_STRIP_TRAILING_WHITESPACE
+    )
+    message("Git revision: ${GIT_REVISION}")
+    set(PLUGIN_VERSION "${PLUGIN_VERSION} \(${GIT_REVISION}\)")
+endif()
+
 find_package(Qt5 REQUIRED COMPONENTS Core)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED qfiletransport.cpp)
@@ -60,4 +75,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt5::Core audcore)
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "AUDCORE_DLL_NAME=\"${AUDCORE_DLL_NAME}\"")
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "PLUGIN_VERSION=\"${PLUGIN_VERSION}\"")
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "EXPORT=__declspec(dllexport)")

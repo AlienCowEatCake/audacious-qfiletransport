@@ -104,10 +104,15 @@ static void installUriSchemeHook()
 class QFileTransport : public TransportPlugin
 {
 public:
-    static constexpr PluginInfo info = {"QFileTransport", "QFileTransport",
-                                        "QFileTransport Plugin for Audacious\n"
-                                        "Copyright 2023 Peter S. Zhigalov",
-                                        Q_NULLPTR, PluginQtOnly};
+#if !defined(PLUGIN_VERSION)
+#define PLUGIN_VERSION ""
+#endif
+    static constexpr PluginInfo info = {
+        "QFileTransport", "QFileTransport",
+        "QFileTransport Plugin for Audacious " PLUGIN_VERSION "\n"
+        "https://github.com/AlienCowEatCake/audacious-qfiletransport\n\n"
+        "Copyright (C) 2023 Peter S. Zhigalov",
+        Q_NULLPTR, PluginQtOnly};
 
     static constexpr const char * const schemes[] = {FILE_SCHEME,
                                                      HOOKED_SCHEME};
