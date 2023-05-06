@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(qfiletransport VERSION 0.4 LANGUAGES CXX)
+project(qfiletransport VERSION 0.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,7 +51,7 @@ configure_file(
     "${CMAKE_CURRENT_BINARY_DIR}/libaudcore/audio.h"
     @ONLY
 )
-include_directories("${CMAKE_CURRENT_LIST_DIR}/audacious/src" "${CMAKE_CURRENT_BINARY_DIR}")
+include_directories(SYSTEM "${CMAKE_CURRENT_LIST_DIR}/audacious/src" "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(PLUGIN_VERSION "v${CMAKE_PROJECT_VERSION}")
 find_package(Git)
@@ -71,7 +71,7 @@ endif()
 find_package(Qt5 REQUIRED COMPONENTS Core)
 
 add_library(${CMAKE_PROJECT_NAME} SHARED qfiletransport.cpp)
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE Qt5::Core audcore)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE audcore Qt5::Core)
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES PREFIX "")
 set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES LINK_FLAGS_RELEASE -s)
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE "AUDCORE_DLL_NAME=\"${AUDCORE_DLL_NAME}\"")
