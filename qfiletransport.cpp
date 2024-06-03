@@ -192,7 +192,7 @@ static QStringList strListToQStringList(const char * list, const char * delims)
     const Index<String> index = str_list_to_index(list, delims);
     QStringList result;
     for (const String & str : index)
-        result.append(QString::fromLocal8Bit(str));
+        result.append(QString::fromLocal8Bit(static_cast<const char *>(str)));
     return result;
 }
 
@@ -262,6 +262,36 @@ static void installUriSchemeHook()
             WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
                                patch, jumpSize, Q_NULLPTR);
         }
+#elif defined(_M_X64)
+        LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
+            GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
+        if (originalAddressUriGetScheme)
+        {
+            LPVOID patchedAddressUriGetScheme =
+                reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
+            constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+            char patch[jumpSize];
+            memcpy(patch, "\x49\xBA", 2);
+            memcpy(patch + 2, &patchedAddressUriGetScheme, sizeof(LPVOID));
+            memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+            WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
+                               patch, jumpSize, Q_NULLPTR);
+        }
+
+        LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
+            GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
+        if (originalAddressArtSearch)
+        {
+            LPVOID patchedAddressArtSearch =
+                reinterpret_cast<LPVOID>(&art_search_patched);
+            constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+            char patch[jumpSize];
+            memcpy(patch, "\x49\xBA", 2);
+            memcpy(patch + 2, &patchedAddressArtSearch, sizeof(LPVOID));
+            memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+            WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
+                               patch, jumpSize, Q_NULLPTR);
+        }
 #endif
         FreeLibrary(audcoreLib);
     }
@@ -278,7 +308,7 @@ public:
         "QFileTransport", "QFileTransport",
         "QFileTransport Plugin for Audacious " PLUGIN_VERSION "\n"
         "https://github.com/AlienCowEatCake/audacious-qfiletransport\n\n"
-        "Copyright (C) 2023 Peter S. Zhigalov",
+        "Copyright (C) 2023-2024 Peter S. Zhigalov",
         Q_NULLPTR, PluginQtOnly};
 
     static constexpr const char * const schemes[] = {FILE_SCHEME,
