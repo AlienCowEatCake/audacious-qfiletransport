@@ -26,8 +26,18 @@ static QString toLocalFile(const QByteArray & str)
 {
     const QUrl url(str);
     if (url.isValid() && url.isLocalFile())
-        return QUrl(str).toLocalFile();
-    return QFileInfo(str).absoluteFilePath();
+        return QFileInfo(QUrl(str).toLocalFile()).absoluteFilePath();
+
+    QByteArray tmp = str;
+#if defined(_WIN32)
+    /// @note For `file://C:\Users\User/.adplug/adplug.db`
+    if (tmp.size() > 7 && tmp.startsWith("file://") && tmp[7] != '/')
+        tmp = tmp.mid(7);
+    /// @note For `/C:\some\path`
+    if (tmp.size() > 2 && tmp[0] == '/' && tmp[2] == ':')
+        tmp = tmp.mid(1);
+#endif
+    return QFileInfo(tmp).absoluteFilePath();
 }
 
 static QByteArray fromLocalFile(const QString & str)
@@ -59,12 +69,24 @@ static bool pluginEnabled()
 static StringBuf uri_get_scheme_patched(const char * uri)
 {
     const char * delim = strstr(uri, "://");
-    if ((!delim || !strcmp_nocase(uri, FILE_SCHEME, delim - uri)) &&
-        pluginEnabled())
+    if (!delim || !strcmp_nocase(uri, FILE_SCHEME, delim - uri))
     {
-        StringBuf result;
-        result.insert(0, HOOKED_SCHEME);
-        return result;
+        /// @note Override scheme only for network files
+        const QString localFile = toLocalFile(uri);
+        if (localFile.startsWith("//") || localFile.startsWith("\\\\"))
+        {
+            /// @note Avoid earlier pluginEnabled() check due to possible
+            /// deadlock if function is called from other plugins for some
+            /// internal files or configs
+            /// Example: `file://C:\Users\User/.adplug/adplug.db`
+            /// https://github.com/AlienCowEatCake/audacious-qfiletransport/issues/1
+            if (pluginEnabled())
+            {
+                StringBuf result;
+                result.insert(0, HOOKED_SCHEME);
+                return result;
+            }
+        }
     }
     return delim ? str_copy(uri, delim - uri) : StringBuf();
 }
