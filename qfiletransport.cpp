@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <iostream>
+
 #if defined(_WIN32)
 // clang-format off
 #include <windows.h>
@@ -225,6 +227,65 @@ static String art_search_patched(const char * filename)
                                 : String(fromLocalFile(imageLocal).constData());
 }
 
+class VFSFilePatched
+{
+public:
+    static bool get_file_timestamps(const char * filename, int64_t * mtime, int64_t * birthtime);
+};
+
+EXPORT bool VFSFilePatched::get_file_timestamps(const char * filename, int64_t * mtime, int64_t * birthtime)
+{
+    std::cerr << "get_file_timestamps_patched " << filename << std::endl;
+    // Always initialize outputs to "not available"
+    if (mtime)
+        *mtime = -1;
+    if (birthtime)
+        *birthtime = -1;
+
+    const QString local = toLocalFile(filename);
+    std::cerr << "local: " << local.toLocal8Bit().data() << std::endl;
+    if (local.isEmpty())
+        return false;
+
+    const QFileInfo fileInfo = QFileInfo(local);
+    std::cerr << "exists: " << fileInfo.exists() << std::endl;
+    if (!fileInfo.exists())
+        return false;
+
+    if (mtime)
+    {
+        const QDateTime dt = fileInfo.lastModified();
+        std::cerr << "mtime valid: " << dt.isValid() << std::endl;
+        if (dt.isValid())
+            *mtime = dt.toSecsSinceEpoch();
+    }
+    if (birthtime)
+    {
+        const QDateTime dt = fileInfo.birthTime();
+        std::cerr << "birthtime valid: " << dt.isValid() << std::endl;
+        if (dt.isValid())
+            *birthtime = dt.toSecsSinceEpoch();
+    }
+    std::cerr << "mtime: " << *mtime << ", birthtime: " << *birthtime << std::endl;
+
+    *birthtime = *birthtime - 31536000;
+    *mtime = *mtime - 31536000;
+
+    QDateTime dt = QDateTime::fromSecsSinceEpoch(*mtime).toLocalTime();
+    std::cerr << QLocale().toString(dt, QLocale::ShortFormat).toLocal8Bit().data() << std::endl;
+    dt = QDateTime::fromSecsSinceEpoch(*birthtime).toLocalTime();
+    std::cerr << QLocale().toString(dt, QLocale::ShortFormat).toLocal8Bit().data() << std::endl;
+
+    return true;
+}
+
+bool get_file_timestamps2(void* skip, const char * filename, int64_t * mtime, int64_t * birthtime)
+{
+    std::cerr << "get_file_timestamps_patched2 " << filename << std::endl;
+
+    return VFSFilePatched::get_file_timestamps(filename, mtime, birthtime);
+}
+
 static void installUriSchemeHook()
 {
 #if defined(_WIN32)
@@ -383,6 +444,50 @@ static void installUriSchemeHook()
     else
     {
         AUDERR("Can't find art_search() address\n");
+    }
+
+    LPVOID originalAddressGetFileTimestamps = reinterpret_cast<LPVOID>(GetProcAddress(audcoreLib, "_ZN7VFSFile19get_file_timestampsEPKcPxS2_"));
+    if (originalAddressGetFileTimestamps)
+    {
+        AUDERR("OFFSET: %llx\n", ((unsigned long long)originalAddressGetFileTimestamps) - ((unsigned long long)audcoreLib));
+
+
+        LPVOID patchedAddressGetFileTimestamps = reinterpret_cast<LPVOID>(&VFSFilePatched::get_file_timestamps);
+        constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+        char patch[jumpSize];
+        memcpy(patch, "\x49\xBA", 2);
+        memcpy(patch + 2, &patchedAddressGetFileTimestamps, sizeof(LPVOID));
+        memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+        if (!WriteProcessMemory(GetCurrentProcess(), originalAddressGetFileTimestamps, patch, jumpSize, Q_NULLPTR))
+        {
+            AUDERR("Can't patch get_file_timestamps()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find get_file_timestamps() address\n");
+    }
+
+
+    LPVOID originalAddressGetFileTimestamps2 = reinterpret_cast<LPVOID>(
+                        reinterpret_cast<LPBYTE>(audcoreLib) +
+                        0x2f4c0);
+    if (originalAddressGetFileTimestamps2)
+    {
+        LPVOID patchedAddressGetFileTimestamps2 = reinterpret_cast<LPVOID>(&get_file_timestamps2);
+        constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+        char patch[jumpSize];
+        memcpy(patch, "\x49\xBA", 2);
+        memcpy(patch + 2, &patchedAddressGetFileTimestamps2, sizeof(LPVOID));
+        memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+        if (!WriteProcessMemory(GetCurrentProcess(), originalAddressGetFileTimestamps2, patch, jumpSize, Q_NULLPTR))
+        {
+            AUDERR("Can't patch get_file_timestamps2()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find get_file_timestamps2() address\n");
     }
 #endif
 
