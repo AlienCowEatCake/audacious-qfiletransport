@@ -14,7 +14,7 @@ endif()
 set(AUDACIOUS_ROOT_DIR "${AUDACIOUS_ROOT_DIR_DEFAULT}" CACHE PATH "Path to Audacions binaries root directory")
 
 set(AUDCORE_DLL_NAME)
-foreach(AUDCORE_DLL_NAME_TEST "audcore" "audcore5")
+foreach(AUDCORE_DLL_NAME_TEST "audcore" "audcore5" "libaudcore-6")
     if(EXISTS "${AUDACIOUS_ROOT_DIR}/bin/${AUDCORE_DLL_NAME_TEST}.dll")
         set(AUDCORE_DLL_NAME "${AUDCORE_DLL_NAME_TEST}")
         break()
