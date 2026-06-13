@@ -202,7 +202,8 @@ static String art_search_patched(const char * filename)
     if (local.isEmpty())
         return String();
 
-    const QString elem = QFileInfo(local).fileName();
+    const QFileInfo fileInfo = QFileInfo(local);
+    const QString elem = fileInfo.fileName();
     if (elem.isEmpty())
         return String();
 
@@ -212,7 +213,7 @@ static String art_search_patched(const char * filename)
     SearchParams params = {elem, strListToQStringList(include, ", "),
                            strListToQStringList(exclude, ", ")};
 
-    local = QFileInfo(local).absolutePath();
+    local = fileInfo.absolutePath();
     const QString imageLocal = fileinfoRecursiveGetImage(local, &params, 0);
     return imageLocal.isEmpty() ? String()
                                 : String(fromLocalFile(imageLocal).constData());
@@ -225,76 +226,76 @@ static void installUriSchemeHook()
 #define AUDCORE_DLL_NAME "audcore"
 #endif
     HINSTANCE audcoreLib = LoadLibraryA(AUDCORE_DLL_NAME ".dll");
-    if (audcoreLib)
-    {
+    if (!audcoreLib)
+        return;
+
 #if defined(_M_IX86)
-        LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
-            GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
-        if (originalAddressUriGetScheme)
-        {
-            LPVOID patchedAddressUriGetScheme =
-                reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
-            constexpr size_t jumpSize = 1 + sizeof(LPVOID);
-            const size_t jumpOffset =
-                reinterpret_cast<size_t>(patchedAddressUriGetScheme) -
-                (reinterpret_cast<size_t>(originalAddressUriGetScheme) +
-                 jumpSize);
-            char patch[jumpSize];
-            memcpy(patch, "\xE9", 1);
-            memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
-            WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
-                               patch, jumpSize, Q_NULLPTR);
-        }
-
-        LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
-            GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
-        if (originalAddressArtSearch)
-        {
-            LPVOID patchedAddressArtSearch =
-                reinterpret_cast<LPVOID>(&art_search_patched);
-            constexpr size_t jumpSize = 1 + sizeof(LPVOID);
-            const size_t jumpOffset =
-                reinterpret_cast<size_t>(patchedAddressArtSearch) -
-                (reinterpret_cast<size_t>(originalAddressArtSearch) + jumpSize);
-            char patch[jumpSize];
-            memcpy(patch, "\xE9", 1);
-            memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
-            WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
-                               patch, jumpSize, Q_NULLPTR);
-        }
-#elif defined(_M_X64)
-        LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
-            GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
-        if (originalAddressUriGetScheme)
-        {
-            LPVOID patchedAddressUriGetScheme =
-                reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
-            constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
-            char patch[jumpSize];
-            memcpy(patch, "\x49\xBA", 2);
-            memcpy(patch + 2, &patchedAddressUriGetScheme, sizeof(LPVOID));
-            memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
-            WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
-                               patch, jumpSize, Q_NULLPTR);
-        }
-
-        LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
-            GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
-        if (originalAddressArtSearch)
-        {
-            LPVOID patchedAddressArtSearch =
-                reinterpret_cast<LPVOID>(&art_search_patched);
-            constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
-            char patch[jumpSize];
-            memcpy(patch, "\x49\xBA", 2);
-            memcpy(patch + 2, &patchedAddressArtSearch, sizeof(LPVOID));
-            memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
-            WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
-                               patch, jumpSize, Q_NULLPTR);
-        }
-#endif
-        FreeLibrary(audcoreLib);
+    LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
+        GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
+    if (originalAddressUriGetScheme)
+    {
+        LPVOID patchedAddressUriGetScheme =
+            reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
+        constexpr size_t jumpSize = 1 + sizeof(LPVOID);
+        const size_t jumpOffset =
+            reinterpret_cast<size_t>(patchedAddressUriGetScheme) -
+            (reinterpret_cast<size_t>(originalAddressUriGetScheme) + jumpSize);
+        char patch[jumpSize];
+        memcpy(patch, "\xE9", 1);
+        memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
+        WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
+                           patch, jumpSize, Q_NULLPTR);
     }
+
+    LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
+        GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
+    if (originalAddressArtSearch)
+    {
+        LPVOID patchedAddressArtSearch =
+            reinterpret_cast<LPVOID>(&art_search_patched);
+        constexpr size_t jumpSize = 1 + sizeof(LPVOID);
+        const size_t jumpOffset =
+            reinterpret_cast<size_t>(patchedAddressArtSearch) -
+            (reinterpret_cast<size_t>(originalAddressArtSearch) + jumpSize);
+        char patch[jumpSize];
+        memcpy(patch, "\xE9", 1);
+        memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
+        WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch, patch,
+                           jumpSize, Q_NULLPTR);
+    }
+#elif defined(_M_X64)
+    LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
+        GetProcAddress(audcoreLib, "_Z14uri_get_schemePKc"));
+    if (originalAddressUriGetScheme)
+    {
+        LPVOID patchedAddressUriGetScheme =
+            reinterpret_cast<LPVOID>(&uri_get_scheme_patched);
+        constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+        char patch[jumpSize];
+        memcpy(patch, "\x49\xBA", 2);
+        memcpy(patch + 2, &patchedAddressUriGetScheme, sizeof(LPVOID));
+        memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+        WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
+                           patch, jumpSize, Q_NULLPTR);
+    }
+
+    LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
+        GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
+    if (originalAddressArtSearch)
+    {
+        LPVOID patchedAddressArtSearch =
+            reinterpret_cast<LPVOID>(&art_search_patched);
+        constexpr size_t jumpSize = 2 + sizeof(LPVOID) + 3;
+        char patch[jumpSize];
+        memcpy(patch, "\x49\xBA", 2);
+        memcpy(patch + 2, &patchedAddressArtSearch, sizeof(LPVOID));
+        memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
+        WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch, patch,
+                           jumpSize, Q_NULLPTR);
+    }
+#endif
+
+    FreeLibrary(audcoreLib);
 #endif
 }
 
