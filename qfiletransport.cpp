@@ -308,7 +308,7 @@ public:
         "QFileTransport", "QFileTransport",
         "QFileTransport Plugin for Audacious " PLUGIN_VERSION "\n"
         "https://github.com/AlienCowEatCake/audacious-qfiletransport\n\n"
-        "Copyright (C) 2023-2025 Peter S. Zhigalov",
+        "Copyright (C) 2023-2026 Peter S. Zhigalov",
         Q_NULLPTR, PluginQtOnly};
 
     static constexpr const char * const schemes[] = {FILE_SCHEME,
