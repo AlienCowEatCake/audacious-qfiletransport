@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(qfiletransport VERSION 0.12 LANGUAGES CXX)
+project(qfiletransport VERSION 0.13 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
