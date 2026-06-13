@@ -3,12 +3,18 @@
 #include <cstring>
 
 #if defined(_WIN32)
+// clang-format off
 #include <windows.h>
+#include <psapi.h>
+// clang-format on
 #endif
 
+#include <QByteArray>
+#include <QCryptographicHash>
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QMap>
 #include <QRegularExpression>
 #include <QString>
 #include <QUrl>
@@ -243,8 +249,16 @@ static void installUriSchemeHook()
         char patch[jumpSize];
         memcpy(patch, "\xE9", 1);
         memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
-        WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
-                           patch, jumpSize, Q_NULLPTR);
+        if (!WriteProcessMemory(GetCurrentProcess(),
+                                originalAddressUriGetScheme, patch, jumpSize,
+                                Q_NULLPTR))
+        {
+            AUDERR("Can't patch uri_get_scheme()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find uri_get_scheme() address\n");
     }
 
     LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
@@ -260,8 +274,15 @@ static void installUriSchemeHook()
         char patch[jumpSize];
         memcpy(patch, "\xE9", 1);
         memcpy(patch + 1, &jumpOffset, sizeof(LPVOID));
-        WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch, patch,
-                           jumpSize, Q_NULLPTR);
+        if (!WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
+                                patch, jumpSize, Q_NULLPTR))
+        {
+            AUDERR("Can't patch art_search()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find art_search() address\n");
     }
 #elif defined(_M_X64)
     LPVOID originalAddressUriGetScheme = reinterpret_cast<LPVOID>(
@@ -275,12 +296,75 @@ static void installUriSchemeHook()
         memcpy(patch, "\x49\xBA", 2);
         memcpy(patch + 2, &patchedAddressUriGetScheme, sizeof(LPVOID));
         memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
-        WriteProcessMemory(GetCurrentProcess(), originalAddressUriGetScheme,
-                           patch, jumpSize, Q_NULLPTR);
+        if (!WriteProcessMemory(GetCurrentProcess(),
+                                originalAddressUriGetScheme, patch, jumpSize,
+                                Q_NULLPTR))
+        {
+            AUDERR("Can't patch uri_get_scheme()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find uri_get_scheme() address\n");
     }
 
     LPVOID originalAddressArtSearch = reinterpret_cast<LPVOID>(
         GetProcAddress(audcoreLib, "_Z10art_searchPKc"));
+    if (!originalAddressArtSearch)
+    {
+        static const QMap<QByteArray, quint64> offsets = {
+            // Audacious 4.6-beta1, Ghidra: FUN_3b0934e5e
+            {"f0e09b4ecf78aebb508bc16eaea9c687f71ef20e8bd21cf03e38ceb24b20839d",
+             0x4E5E},
+            // Audacious 4.6.1, Ghidra: FUN_3b09347c0
+            {"30af924ee5efbab0d6646e152bd058b2c1567ac6dfd2b380d33f988cb9c82a48",
+             0x47C0},
+        };
+
+#if 0
+        MODULEINFO moduleInfo;
+        ZeroMemory(&moduleInfo, sizeof(moduleInfo));
+        if (GetModuleInformation(GetCurrentProcess(), audcoreLib, &moduleInfo,
+                                 sizeof(moduleInfo)))
+        {
+            const QByteArray moduleData = QByteArray::fromRawData(
+                reinterpret_cast<const char *>(moduleInfo.lpBaseOfDll),
+                moduleInfo.SizeOfImage);
+            const char signature[] =
+                "\x56\x53\x48\x81\xec\xb8\x00\x00\x00\x41\xb8\x01\x00\x00\x00";
+            const QByteArray signatureData =
+                QByteArray::fromRawData(signature, sizeof(signature) - 1);
+            AUDERR("first: %lld\n", static_cast<long long int>(
+                                        moduleData.indexOf(signatureData)));
+            AUDERR("last:  %lld\n", static_cast<long long int>(
+                                        moduleData.lastIndexOf(signatureData)));
+        }
+#endif
+
+        WCHAR audcorePath[MAX_PATH + 1] = {};
+        if (GetModuleFileNameW(audcoreLib, audcorePath, MAX_PATH))
+        {
+            QFile audcoreFile(QString::fromStdWString(audcorePath));
+            QByteArray audcoreSha256;
+            if (audcoreFile.open(QFile::ReadOnly | QFile::ExistingOnly))
+            {
+                QCryptographicHash audcoreHash(QCryptographicHash::Sha256);
+                if (audcoreHash.addData(&audcoreFile))
+                    audcoreSha256 = audcoreHash.result().toHex();
+            }
+            audcoreFile.close();
+            if (!audcoreSha256.isEmpty())
+            {
+                const auto offsetsIt = offsets.find(audcoreSha256);
+                if (offsetsIt != offsets.constEnd())
+                {
+                    originalAddressArtSearch = reinterpret_cast<LPVOID>(
+                        reinterpret_cast<LPBYTE>(audcoreLib) +
+                        offsetsIt.value());
+                }
+            }
+        }
+    }
     if (originalAddressArtSearch)
     {
         LPVOID patchedAddressArtSearch =
@@ -290,8 +374,15 @@ static void installUriSchemeHook()
         memcpy(patch, "\x49\xBA", 2);
         memcpy(patch + 2, &patchedAddressArtSearch, sizeof(LPVOID));
         memcpy(patch + 2 + sizeof(LPVOID), "\x41\xFF\xE2", 3);
-        WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch, patch,
-                           jumpSize, Q_NULLPTR);
+        if (!WriteProcessMemory(GetCurrentProcess(), originalAddressArtSearch,
+                                patch, jumpSize, Q_NULLPTR))
+        {
+            AUDERR("Can't patch art_search()\n");
+        }
+    }
+    else
+    {
+        AUDERR("Can't find art_search() address\n");
     }
 #endif
 
