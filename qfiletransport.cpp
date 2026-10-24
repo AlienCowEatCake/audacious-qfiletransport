@@ -327,27 +327,6 @@ static void installUriSchemeHook()
             {"30af924ee5efbab0d6646e152bd058b2c1567ac6dfd2b380d33f988cb9c82a48",
              0x47C0},
         };
-
-#if 0
-        MODULEINFO moduleInfo;
-        ZeroMemory(&moduleInfo, sizeof(moduleInfo));
-        if (GetModuleInformation(GetCurrentProcess(), audcoreLib, &moduleInfo,
-                                 sizeof(moduleInfo)))
-        {
-            const QByteArray moduleData = QByteArray::fromRawData(
-                reinterpret_cast<const char *>(moduleInfo.lpBaseOfDll),
-                moduleInfo.SizeOfImage);
-            const char signature[] =
-                "\x56\x53\x48\x81\xec\xb8\x00\x00\x00\x41\xb8\x01\x00\x00\x00";
-            const QByteArray signatureData =
-                QByteArray::fromRawData(signature, sizeof(signature) - 1);
-            AUDERR("first: %lld\n", static_cast<long long int>(
-                                        moduleData.indexOf(signatureData)));
-            AUDERR("last:  %lld\n", static_cast<long long int>(
-                                        moduleData.lastIndexOf(signatureData)));
-        }
-#endif
-
         WCHAR audcorePath[MAX_PATH + 1] = {};
         if (GetModuleFileNameW(audcoreLib, audcorePath, MAX_PATH))
         {
