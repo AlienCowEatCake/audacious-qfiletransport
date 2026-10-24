@@ -228,6 +228,8 @@ static String art_search_patched(const char * filename)
 static void installUriSchemeHook()
 {
 #if defined(_WIN32)
+    /// @note Pin plugin module handle to prevent early unloading
+    /// https://github.com/AlienCowEatCake/audacious-qfiletransport/issues/4
     HMODULE hm;
     GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                            GET_MODULE_HANDLE_EX_FLAG_PIN,
