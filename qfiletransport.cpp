@@ -228,6 +228,11 @@ static String art_search_patched(const char * filename)
 static void installUriSchemeHook()
 {
 #if defined(_WIN32)
+    HMODULE hm;
+    GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                           GET_MODULE_HANDLE_EX_FLAG_PIN,
+                       (LPCSTR)&installUriSchemeHook, &hm);
+
 #if !defined(AUDCORE_DLL_NAME)
 #define AUDCORE_DLL_NAME "audcore"
 #endif
