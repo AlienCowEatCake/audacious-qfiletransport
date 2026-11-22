@@ -326,6 +326,9 @@ static void installUriSchemeHook()
             // Audacious 4.6.1, Ghidra: FUN_3b09347c0
             {"30af924ee5efbab0d6646e152bd058b2c1567ac6dfd2b380d33f988cb9c82a48",
              0x47C0},
+            // Audacious 4.6.2, Ghidra: FUN_3b0934f5e
+            {"e47c61af3a9f5a90aacf7666e7140f41e15bbc5caebe5a69696d16a68800b279",
+             0x4F5E},
         };
         WCHAR audcorePath[MAX_PATH + 1] = {};
         if (GetModuleFileNameW(audcoreLib, audcorePath, MAX_PATH))
